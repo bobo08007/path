@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation
+END
+FTAnimation.h
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation/FTAnimation.h
+END
+FTAnimationManager.m
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation/FTAnimationManager.m
+END
+FTUtils.h
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation/FTUtils.h
+END
+FTAnimation+UIView.h
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation/FTAnimation+UIView.h
+END
+FTUtils+NSObject.h
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation/FTUtils+NSObject.h
+END
+FTAnimation+UIView.m
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation/FTAnimation+UIView.m
+END
+FTUtils+NSObject.m
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation/FTUtils+NSObject.m
+END
+FTAnimationManager.h
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/iPhone/!svn/ver/7/Pathway/trunk/Pathways/Classes/Slide%20Animation/FTAnimationManager.h
+END

@@ -1,0 +1,25 @@
+//
+//  HomeVC.h
+//  Pathways
+//
+//  Created by iMac on 23/02/11.
+//  Copyright 2011 __MyCompanyName__. All rights reserved.
+//
+
+#import <UIKit/UIKit.h>
+#import "Three20.h"
+@class LandingView;
+
+@interface HomeVC :  TTViewController <UINavigationControllerDelegate> {
+	UIView *_overlayView;
+
+	UINavigationController *_launcherNavigationController;
+	UIViewController *_launcherNavigationControllerTopViewController;
+	IBOutlet LandingView *_launcherView;
+	NSArray *modulesListAray;
+}
+@property(nonatomic, retain) UINavigationController *launcherNavigationController;
+@property(nonatomic, readonly) LandingView *launcherView;
+@property(nonatomic, retain) UIViewController *launcherNavigationControllerTopViewController;
+-(IBAction)buttonAction:(UIButton*)sender;
+@end

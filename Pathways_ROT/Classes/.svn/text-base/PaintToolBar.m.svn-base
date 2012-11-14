@@ -1,0 +1,49 @@
+//
+//  PaintToolBar.m
+//  Pathways
+//
+//  Created by iMac on 23/02/11.
+//  Copyright 2011 __MyCompanyName__. All rights reserved.
+//
+
+#import "PaintToolBar.h"
+#import "UIView+Gradient.h"
+
+@implementation PaintToolBar
+
+
+- (id)initWithFrame:(CGRect)frame {
+    
+    self = [super initWithFrame:frame];
+    if (self) {
+        //self.backgroundColor = [UIColor clearColor];
+    }
+    return self;
+}
+/*
+- (void)drawRect:(CGRect)rect {
+	[[UIColor blackColor] set];	
+	UIBezierPath *rectsbyroundtop = [UIBezierPath bezierPathWithRoundedRect:rect byRoundingCorners:UIRectCornerTopLeft|UIRectCornerTopRight cornerRadii:CGSizeMake(6, 6)];
+    [rectsbyroundtop fill];
+	
+	[[UIColor whiteColor] set];
+	rectsbyroundtop.lineWidth = 2;
+	[rectsbyroundtop stroke];
+	
+	
+	CGFloat colors[] =
+	{
+		200 / 255.0, 207.0 / 255.0, 212.0 / 255.0, 0.1,
+		169 / 255.0,  178.0 / 255.0, 185 / 255.0, 0.8
+	};
+	[UIView drawLinearGradientInRect:CGRectMake(0, 0, 320, CGRectGetHeight(rect)-0.5) colors:colors];
+	
+}
+*/
+
+- (void)dealloc {
+    [super dealloc];
+}
+
+
+@end

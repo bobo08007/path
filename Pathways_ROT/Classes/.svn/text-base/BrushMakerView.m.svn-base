@@ -1,0 +1,154 @@
+//
+//  BrushMakerView.m
+//  Pathways
+//
+//  Created by iMac on 08/03/11.
+//  Copyright 2011 __MyCompanyName__. All rights reserved.
+//
+
+#import "BrushMakerView.h"
+#import "Brush.h"
+#import "FTAnimation.h"
+
+#define kSliderHeight			7.0
+
+//static UIImage *sizeSelected = nil;
+//static UIImage *colorSelected = nil;
+static UIImage *closeImage = nil;
+@implementation BrushMakerView
+
+@synthesize brushMakerDelegate;
+
++(void)initialize{
+	//sizeSelected = [[UIImage imageNamed:@"button_size.png"] retain];
+	//colorSelected = [[UIImage imageNamed:@"button_color.png"] retain];
+	closeImage = [[UIImage imageNamed:@"button_close.png"] retain];
+}
+- (id)initWithFrame:(CGRect)frame {
+    
+    self = [super initWithFrame:frame];
+    if (self) {
+        // Initialization code.
+    }
+	
+	self.backgroundColor = [UIColor clearColor];
+	/*
+	sizeButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	sizeButton.frame = CGRectMake(5, 5, sizeSelected.size.width, sizeSelected.size.height);
+	[sizeButton addTarget:self action:@selector(sizeButtonAction) forControlEvents:UIControlEventTouchUpInside];
+	[sizeButton setImage:sizeSelected forState:UIControlStateNormal];
+	[self addSubview:sizeButton];
+	
+	
+	colorButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	colorButton.frame = CGRectMake(sizeSelected.size.width+5, 5, colorSelected.size.width, colorSelected.size.height);
+	colorButton.contentMode = UIViewContentModeTop;
+	[colorButton addTarget:self action:@selector(colorButtonAction) forControlEvents:UIControlEventTouchUpInside];
+	[colorButton setImage:colorSelected forState:UIControlStateNormal];
+	[self addSubview:colorButton];
+	*/
+	closeButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	closeButton.frame = CGRectMake(CGRectGetMaxX(self.frame)-closeImage.size.height, 8, closeImage.size.width, closeImage.size.height);
+	closeButton.contentMode = UIViewContentModeTop;
+	[closeButton addTarget:self action:@selector(closeButtonAction) forControlEvents:UIControlEventTouchUpInside];
+	[closeButton setImage:closeImage forState:UIControlStateNormal];
+	[self addSubview:closeButton];
+	
+    return self;
+}
+-(void)sliderAction{
+	[self setNeedsDisplay];
+}
+BOOL isBrush = TRUE;
+-(void)sizeButtonAction{
+	if(!isBrush){
+		[colorPicker popOut:0.3 delegate:nil];
+		//[slider popIn:0.3 delegate:nil];
+		isBrush = TRUE;
+	}
+}
+
+-(void)closeButtonAction{
+	
+	brush.brushColor = [colorPicker color];
+	//brush.brushSize = [NSNumber numberWithInt:slider.value];
+	
+	if(brushMakerDelegate && [brushMakerDelegate respondsToSelector:@selector(closeBrushMakerView)]){
+		[brushMakerDelegate performSelector:@selector(closeBrushMakerView)];
+	}
+}
+-(void)colorButtonAction{
+	if (isBrush) {
+	//	[slider popOut:0.3 delegate:nil];
+		[colorPicker popIn:0.3 delegate:nil];
+		isBrush = FALSE;
+	}
+}
+
+-(void)initializeColorPicker{
+	NSString * coderPath = [NSHomeDirectory() stringByAppendingFormat:@"/Documents/save.dat"];
+	if ([[NSFileManager defaultManager] fileExistsAtPath:coderPath]) {
+		colorPicker = [[NSKeyedUnarchiver unarchiveObjectWithFile:coderPath] retain];
+	} else {
+		colorPicker = [[ColorPickerView alloc] initWithFrame:CGRectMake(10, 43, 270, 220)];
+	}
+	[colorPicker setColor:brush.brushColor];
+	colorPicker.hidden = YES;
+	[self addSubview:colorPicker];
+}
+/*
+-(void)initializeSliderView{
+	
+	CGRect frame = CGRectMake(30, CGRectGetHeight(self.frame)/2-kSliderHeight/2, CGRectGetWidth(self.frame)-60, kSliderHeight);
+	slider = [[UISlider alloc] initWithFrame:frame];
+	[slider addTarget:self action:@selector(sliderAction) forControlEvents:UIControlEventValueChanged];
+	slider.backgroundColor = [UIColor clearColor];	
+	UIImage *stetchLeftTrack = [[UIImage imageNamed:@"slider_select.png"]
+								stretchableImageWithLeftCapWidth:10.0 topCapHeight:0.0];
+	UIImage *stetchRightTrack = [[UIImage imageNamed:@"slider_bar.png"]
+								 stretchableImageWithLeftCapWidth:10.0 topCapHeight:0.0];
+	[slider setThumbImage: [UIImage imageNamed:@"slider_mover.png"] forState:UIControlStateNormal];
+	[slider setMinimumTrackImage:stetchLeftTrack forState:UIControlStateNormal];
+	[slider setMaximumTrackImage:stetchRightTrack forState:UIControlStateNormal];
+	slider.minimumValue = 1.0;
+	slider.maximumValue = 16;
+	slider.continuous = YES;
+	slider.value = slider.maximumValue/4;
+	
+	slider.hidden = NO;
+
+	[slider setAccessibilityLabel:NSLocalizedString(@"CustomSlider", @"")];
+	
+	[self addSubview:slider];
+}
+*/
+-(void)setBrush:(Brush*)aBrush{
+	brush = aBrush;
+	
+	const CGFloat *pxl = CGColorGetComponents(brush.brushColor.CGColor);
+
+	NSLog(@"B Color %f,%f,%f,%f",pxl[0],pxl[1],pxl[2],pxl[3]);
+	
+	if(!colorPicker)
+	{
+//		[self performSelector:@selector(initializeSliderView)];
+		[self performSelector:@selector(initializeColorPicker)];
+	}
+}
+
+- (void)drawRect:(CGRect)rect {
+    
+	[[UIColor colorWithRed:0.243 green:0.255 blue:0.293 alpha:1.0] set];	
+	UIBezierPath *rectsbyroundtop = [UIBezierPath bezierPathWithRoundedRect:rect byRoundingCorners:UIRectCornerAllCorners cornerRadii:CGSizeMake(5, 5)];
+    [rectsbyroundtop fill];
+}
+
+
+- (void)dealloc {
+	[colorPicker release];
+	//[slider release];
+    [super dealloc];
+}
+
+
+@end

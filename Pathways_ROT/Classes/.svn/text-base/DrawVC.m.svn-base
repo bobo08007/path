@@ -1,0 +1,799 @@
+//
+//  DrawVC.m
+//  Pathways
+//
+//  Created by iMac on 23/02/11.
+//  Copyright 2011 __MyCompanyName__. All rights reserved.
+//
+
+#import "DrawVC.h"
+
+
+#import "PaintingView.h"
+#import "SoundEffect.h"
+#import "PaintingMacros.h"
+#import "PaintToolBar.h"
+#import "Three20.h"
+#import "Brush.h"
+#import "UIViewAdditions.h"
+
+#import "FTAnimation.h"
+#import "GlobalSettings.h"
+#import "BrushColorPicker.h"
+#import "DropDownView.h"
+#import "NSOperationQueue+CWSharedQueue.h"
+
+
+#import "BrushSliderView.h"
+
+//CONSTANTS:
+
+#define kPaletteHeight			30
+#define kPaletteSize			5
+#define kMinEraseInterval		0.5
+
+// Padding for margins
+#define kLeftMargin				10.0
+#define kTopMargin				10.0
+#define kRightMargin			10.0
+
+
+//Social N/W
+
+#define kOAuthConsumerKey				@"3Dq3DxL7wKpFoqo4zgCLcQ"		
+#define kOAuthConsumerSecret			@"pmOAnLyVaYxevATotNsIOpb0CH9FGd58seA8reKrhk"
+
+#define FBkOAuthConsumerKey			@"287225a9641de0cfa6abc39e4c2f20cd"
+#define FBkOAuthConsumerSecret		@"686a0f966247d79a17cd34ecf6bb4211"
+
+#import "SA_OAuthTwitterEngine.h"
+
+static UIImage *selected_image = nil;
+static UIImage *unSelected_image = nil;
+
+@implementation DrawVC
++(void)initialize{
+	selected_image = [[UIImage imageNamed:@"pobut_select.png"] retain];
+	unSelected_image = [[UIImage imageNamed:@"pobut_normal.png"] retain];
+	
+}
+-(void)awakeFromNib{
+	[self setUpPaintToolBar];
+}
+- (void)viewDidLoad {
+   [super viewDidLoad];
+	
+		
+	self.title = @"Draw";
+//	self.view.backgroundColor = TTSTYLEVAR(screenBackgroundColor);
+		
+	NSBundle *mainBundle = [NSBundle mainBundle];	
+	erasingSound = [[SoundEffect alloc] initWithContentsOfFile:[mainBundle pathForResource:@"Erase" ofType:@"caf"]];
+	selectSound =  [[SoundEffect alloc] initWithContentsOfFile:[mainBundle pathForResource:@"Select" ofType:@"caf"]];
+	CGFloat components[3];
+	
+	HSL2RGB(kPaletteSize, kSaturation, kLuminosity, &components[0], &components[1], &components[2]);
+	glColor4f(components[0], components[1], components[2], kBrushOpacity);
+
+	brush = [[Brush alloc] init];
+	UIColor *bColor = [UIColor colorWithRed:components[0] green:components[1] blue:components[2] alpha:1];
+	brush.brushColor = bColor;
+	brush.brushSize = [NSNumber numberWithInt:4];
+	[self performSelector:@selector(updatePaintView)];
+	
+	[self setUpPaintToolBar];
+		
+	UIBarButtonItem* camera = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCamera target:self action:@selector(changeBackground:)];
+	[self.navigationItem setRightBarButtonItem:camera animated:YES];
+	[camera release];
+	
+	//[self performSelector:@selector(showOrHideTopBottom) withObject:nil afterDelay:3];
+
+	backgroundImageView = [[UIImageView alloc] initWithFrame:drawingView.frame];
+	backgroundImageView.image = [UIImage imageNamed:@"Default.png"];
+	[self.view insertSubview:backgroundImageView atIndex:0];
+	
+
+	//undoImageView = [[UIImageView alloc] initWithFrame:backgroundImageView.frame];
+	//[backgroundImageView insertSubview:undoImageView atIndex:0];
+	
+	bitMapImages = [[NSMutableArray alloc] init];
+}
+
+- (void)viewWillAppear:(BOOL)animated
+{
+	self.navigationController.navigationBar.barStyle = UIBarStyleBlackTranslucent;
+}
+
+////////////////////////////////////////////////////////////
+
+
+-(void)setUpPaintToolBar{
+	
+	CGPoint bPoint = CGPointMake(5, 5);
+	
+	NSMutableArray *mA = [[NSMutableArray alloc] initWithCapacity:10];
+	{
+		
+		UIImage *image = [UIImage imageNamed:@"pencils.png"];
+		CGRect frame = CGRectMake(bPoint.x, bPoint.y, image.size.width, 30);
+		
+		CGRect sliderRect = CGRectMake(frame.origin.x-2.5, CGRectGetHeight(self.view.frame)-frame.size.height-(0.5*frame.size.height), frame.size.width+30, 60);
+		
+		sliderRect.origin.y =  CGRectGetHeight(self.view.frame)-sliderRect.size.height+10;
+		
+		brushSliderView = [[BrushSliderView alloc] initWithFrame:sliderRect];
+		brushSliderView.brushSliderDelegate = self;
+		brushSliderView.backgroundColor = [UIColor clearColor];
+		[brushSliderView setBrush:brush];
+		brushSliderView.hidden = YES;
+		[self.view addSubview:brushSliderView];
+		
+		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+		[button setImage:image forState:UIControlStateNormal];
+		button.showsTouchWhenHighlighted = YES;
+		SEL action= @selector(brushesButtonAction:);
+		button.frame = frame;
+		[button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+		UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:button];
+		item.target = self; 
+		item.action = action;
+		
+		[mA addObject:item];
+		[item release];
+		
+	}
+	//2
+	{
+		UIImage *image = [UIImage imageNamed:@"toolbar_wheel.png"];
+		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+		button.frame = CGRectMake(bPoint.x, bPoint.y, image.size.width, 30);
+		[button setImage:image forState:UIControlStateNormal];
+		SEL action= @selector(colorButtonAction:);
+		button.showsTouchWhenHighlighted = YES;
+		[button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+
+		UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:button];
+		item.target = self; 
+		item.action = action;
+		
+		[mA addObject:item];
+		[item release];
+		
+	}
+	
+	//2
+	{
+		UIImage *image = [UIImage imageNamed:@"eraser.png"];
+		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+		button.frame = CGRectMake(bPoint.x, bPoint.y, image.size.width, 30);
+		[button setImage:image forState:UIControlStateNormal];
+		SEL action= @selector(eraserButtonAction:);
+		button.showsTouchWhenHighlighted = YES;
+		[button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+
+		UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:button];
+		item.enabled = NO;
+		item.target = self; 
+		item.action = action;
+		
+		[mA addObject:item];
+		[item release];
+		
+	}
+	//3
+	{
+		UIImage *image = [UIImage imageNamed:@"record_play.png"];
+		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+		button.frame = CGRectMake(bPoint.x, bPoint.y, image.size.width, 30);
+		[button setImage:image forState:UIControlStateNormal];
+		SEL action= @selector(record:);
+		button.showsTouchWhenHighlighted = YES;
+		[button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+
+		UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:button];
+		item.target = self; 
+		item.action = action;
+		
+		[mA addObject:item];
+		[item release];
+		
+	}
+	
+	//4
+	{
+		UIImage *image = [UIImage imageNamed:@"undo.png"];
+		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+		button.frame = CGRectMake(bPoint.x, bPoint.y, image.size.width, 30);
+		[button setImage:image forState:UIControlStateNormal];
+		SEL action= @selector(undo:);
+		button.showsTouchWhenHighlighted = YES;
+		[button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+
+		UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:button];
+		item.enabled = NO;
+		item.target = self; 
+		item.action = action;
+		
+		[mA addObject:item];
+		[item release];
+		
+	}
+	//5
+	{
+		UIImage *image = [UIImage imageNamed:@"upload.png"];
+		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+		button.frame = CGRectMake(bPoint.x, bPoint.y, image.size.width, 30);		
+		[button setImage:image forState:UIControlStateNormal];
+		SEL action= @selector(upload:);
+		button.showsTouchWhenHighlighted = YES;
+		[button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+
+		UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:button];
+		item.enabled = NO;
+		item.target = self; 
+		item.action = action;
+		
+		[mA addObject:item];
+		[item release];
+		
+	}
+	
+	//6
+	{
+		UIImage *image = [UIImage imageNamed:@"trash.png"];
+		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+		button.frame = CGRectMake(bPoint.x, bPoint.y, image.size.width, 30);	
+		[button setImage:image forState:UIControlStateNormal];
+		SEL action= @selector(trash:);
+		button.showsTouchWhenHighlighted = YES;
+		[button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+
+		UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:button];
+		item.enabled = NO;
+		item.target = self; 
+		item.action = action;
+		
+		[mA addObject:item];
+		[item release];
+		
+	}
+	//6
+	{
+		UIImage *image = [UIImage imageNamed:@"more_tool.png"];
+		UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+		button.frame = CGRectMake(bPoint.x, bPoint.y, image.size.width, 30);		
+		[button setImage:image forState:UIControlStateNormal];
+		SEL action= @selector(more:);
+		button.showsTouchWhenHighlighted = YES;
+		[button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+
+		UIBarButtonItem *item = [[UIBarButtonItem alloc] initWithCustomView:button];
+		item.enabled = NO;
+		item.target = self; 
+		item.action = action;
+		
+		[mA addObject:item];
+		[item release];
+		
+	}
+	
+	[paintToolBar setItems:mA];
+	
+	[mA release];
+
+}
+
+//To make Toolbar items enable/disable depends on existing draw values
+
+UIImage *firstImage;
+BOOL isToolbarItemsHidden = YES;
+
+-(void)configureToolBarItems:(BOOL)showItems{
+	
+	if (showItems) {
+		[paintToolBar.items setValue:[NSNumber numberWithBool:YES] forKey:@"enabled"];		
+	} else {
+		isToolbarItemsHidden = YES;
+	
+		NSArray *tbItems = paintToolBar.items;
+		
+		int i = 2;
+		
+		for (i; i<tbItems.count; i++) {
+			UIBarButtonItem *toolItem = [tbItems objectAtIndex:i];
+			toolItem.enabled = NO;
+		}
+		
+		UIBarButtonItem *toolItem = [tbItems objectAtIndex:3];
+		toolItem.enabled = YES;
+		
+	}
+}
+
+///////////TOOLBAR ACTIONS/////////////////////
+
+-(IBAction)brushesButtonAction:(id)sender{
+	
+	if(brushSliderView == nil || brushSliderView.hidden){
+		if(!brushColorPicker.hidden){
+			[brushColorPicker popOut:0.3 delegate:nil];
+		}
+		
+		if (dropDownView.hidden == FALSE) {
+			[dropDownView popOut:0.3 delegate:nil];
+		}
+		
+		[paintToolBar.items setValue:[NSNumber numberWithBool:NO] forKey:@"enabled"];
+		[brushSliderView popIn:0.3 delegate:nil];
+	}
+	
+	
+}
+-(IBAction)colorButtonAction:(id)sender
+{
+	if(brushColorPicker == nil || brushColorPicker.hidden){
+	
+		if(!brushSliderView.hidden) {
+			[self closeBrushSliderView];
+		}
+		if(!dropDownView.hidden) {
+			[dropDownView popOut:0.3 delegate:nil];
+		}
+		
+		if(!brushColorPicker){
+			
+			brushColorPicker = [[BrushColorPicker alloc] initWithFrame:CGRectInset(self.view.frame, 15, 90)];
+			brushColorPicker.bcDelegate = self;
+			[brushColorPicker setBrush:brush];
+			brushColorPicker.backgroundColor = [UIColor clearColor];
+			[self.view addSubview:brushColorPicker];
+		} 
+		
+		[brushColorPicker popIn:0.3 delegate:nil];
+	}
+}
+
+-(void)upload:(id)sencer{
+	
+}
+-(void)record:(id)sender{
+	
+}
+
+/**
+ Paint View Delegate Method. After every draw Paint View Captues image and send to here
+ */
+
+
+-(void)saveSnapShot:(UIImage*)image{
+	
+	if(bitMapImages.count > 12){
+		if(firstImage){
+			[firstImage release];
+			firstImage = nil;
+		}
+		firstImage = [[bitMapImages objectAtIndex:0] retain];
+		[bitMapImages removeObjectAtIndex:0];
+	}
+	if(!bitMapImages.count){
+		firstImage = [image retain];
+	}
+	
+	[bitMapImages addObject:image];
+
+	if (isToolbarItemsHidden) {
+		[paintToolBar.items setValue:[NSNumber numberWithBool:YES] forKey:@"enabled"];		
+		isToolbarItemsHidden = NO;
+	}
+	
+}
+
+/**
+ ToolBar Undo Action
+ */
+
+-(IBAction)undo:(id)sender{
+
+	if(bitMapImages.count){
+		[drawingView trash:nil];
+		[bitMapImages removeLastObject];
+		
+		if(bitMapImages.count){
+			UIImage *hoverImage = [bitMapImages lastObject];
+			//undoImageView.image = hoverImage;
+			[drawingView setImage:hoverImage];
+		} else {
+//			undoImageView.image = firstImage;
+			[drawingView setImage:firstImage];
+			[self configureToolBarItems:NO];
+		}
+	}
+}
+
+-(IBAction)redo:(id)sender{
+	// Add image From deleted List
+}
+-(IBAction)eraserButtonAction:(id)sender{
+	[drawingView eraserButtonAction:sender];
+}
+-(IBAction)trash:(id)sender{
+	
+	[bitMapImages removeAllObjects];
+	undoImageView.image = nil;
+
+
+	[self configureToolBarItems : NO];
+
+	if(CFAbsoluteTimeGetCurrent() > lastTime + kMinEraseInterval) {
+		[erasingSound play];
+		[drawingView trash:sender];
+		lastTime = CFAbsoluteTimeGetCurrent();
+	}
+}
+
+-(IBAction)more:(id)sender{
+
+	if(dropDownView == nil || dropDownView.hidden){
+		
+		if(brushColorPicker.hidden == FALSE) {
+			[self closeBrushColorPicker];
+		}
+		if(!brushSliderView.hidden) {
+			[self closeBrushSliderView];
+		}
+		
+		
+		if(!dropDownView){
+			UIImage *ddimage = [UIImage imageNamed:@"pop_down.png"];
+			
+			dropDownView = [[DropDownView alloc] initWithFrame:CGRectMake((CGRectGetMaxX(self.view.frame)-ddimage.size.width), CGRectGetHeight(self.view.frame)-ddimage.size.height-TTToolbarHeight(), ddimage.size.width, ddimage.size.height)];
+			dropDownView.backgroundColor = [UIColor clearColor];
+			[dropDownView setImage:ddimage];
+			[self.view addSubview:dropDownView];
+			
+			float yPadding = 33;
+			float xPadding = 32;
+			{		
+				UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+				button.frame = CGRectMake(xPadding, yPadding, selected_image.size.width, selected_image.size.height);
+				[button setBackgroundImage:unSelected_image forState:UIControlStateNormal];
+				[button setBackgroundImage:selected_image forState:UIControlStateHighlighted];			
+				[button setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+				[button setTitleColor:[UIColor whiteColor] forState:UIControlStateHighlighted];			
+				[button setTitle:@"FaceBook" forState:UIControlStateNormal];
+				button.titleLabel.font = [GlobalSettings lableFont];
+				[button addTarget:self action:@selector(dropDownViewButtonActios:) forControlEvents:UIControlEventTouchUpInside];
+				button.tag = 1;
+				[dropDownView addSubview:button];
+				
+			}
+			{
+				yPadding += 53;
+				UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+				button.frame = CGRectMake(xPadding, yPadding, selected_image.size.width, selected_image.size.height);
+				[button setBackgroundImage:unSelected_image forState:UIControlStateNormal];
+				[button setBackgroundImage:selected_image forState:UIControlStateHighlighted];			
+				[button setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+				[button setTitleColor:[UIColor whiteColor] forState:UIControlStateHighlighted];			
+				[button setTitle:@"Twitter" forState:UIControlStateNormal];
+				button.titleLabel.font = [GlobalSettings lableFont];
+				[button addTarget:self action:@selector(dropDownViewButtonActios:) forControlEvents:UIControlEventTouchUpInside];
+				button.tag = 2;
+				[dropDownView addSubview:button];
+				
+			}
+			{
+				yPadding += 53;
+				UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+				button.frame = CGRectMake(xPadding, yPadding, selected_image.size.width, selected_image.size.height);
+				[button setBackgroundImage:unSelected_image forState:UIControlStateNormal];
+				[button setBackgroundImage:selected_image forState:UIControlStateHighlighted];
+				[button setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+				[button setTitleColor:[UIColor whiteColor] forState:UIControlStateHighlighted];
+				[button setTitle:@"Cancel" forState:UIControlStateNormal];
+				button.titleLabel.font = [GlobalSettings lableFont];
+				[button addTarget:self action:@selector(dropDownViewButtonActios:) forControlEvents:UIControlEventTouchUpInside];
+				button.tag = 3;
+				[dropDownView addSubview:button];
+				
+			}
+		}
+		
+		[dropDownView popIn:0.3 delegate:nil];
+		
+	}
+}
+/////////////TOOLBAR ACTIONS END///////////////////////////////
+
+-(void)dropDownViewButtonActios:(UIButton*)button{
+	if (button.tag != 3) {
+		[self setUpSocailNetworking:button.tag];
+	}
+	[dropDownView popOut:0.3 delegate:nil];
+}
+
+////////////////////////////////////////////////////////////
+
+-(void)closeBrushSliderView{
+
+	[paintToolBar.items setValue:[NSNumber numberWithBool:YES] forKey:@"enabled"];
+	self.navigationItem.leftBarButtonItem.enabled = YES;
+	self.navigationItem.rightBarButtonItem.enabled = YES;
+
+	[brushSliderView popOut:0.3 delegate:nil];
+	[self performSelector:@selector(updatePaintView)];
+
+}
+-(void)closeBrushColorPicker{
+
+	[brushColorPicker popOut:0.3 delegate:nil];
+	[self performSelector:@selector(updatePaintView)];
+	
+}
+
+
+-(void)updatePaintView{
+	
+	[drawingView setBrush:brush];
+	
+}
+
+-(void)didSelectBrushColor:(UIColor*)newColor size:(float)size{
+
+	brush.brushColor = [newColor retain];
+	brush.brushSize = [NSNumber numberWithInt:size];
+	[self performSelector:@selector(updatePaintView)];
+	
+}
+
+//////////////////// HIDE TOP BOTTOM BARS////////////////////////
+
+- (BOOL)isShowingChrome {
+
+	UINavigationBar* bar = self.navigationController.navigationBar;
+	return bar ? bar.alpha != 0 : 1;
+
+}
+
+
+- (void)showBars:(BOOL)show animated:(BOOL)animated {
+
+	[super showBars:show animated:animated withStatusBar:NO];
+	
+	if (!show) {
+		if (!brushSliderView.hidden) {
+			[self closeBrushSliderView];
+		}
+		if(!brushColorPicker.hidden){
+			[brushColorPicker popOut:0.3 delegate:nil];
+		}
+
+		if (!dropDownView.hidden) {
+			[dropDownView popOut:0.3 delegate:nil];
+		}
+		
+	}
+	
+	CGFloat alpha = show ? 1 : 0;
+	if (alpha == paintToolBar.alpha)
+		return;
+	
+	if (animated) {
+		[UIView beginAnimations:nil context:nil];
+		[UIView setAnimationDuration:TT_TRANSITION_DURATION];
+		[UIView setAnimationDelegate:self];
+		if (show) {
+			[UIView setAnimationDidStopSelector:@selector(showBarsAnimationDidStop)];
+		} else {
+			[UIView setAnimationDidStopSelector:@selector(hideBarsAnimationDidStop)];
+		}
+	} else {
+		if (show) {
+			[self showBarsAnimationDidStop];
+		} else {
+			[self hideBarsAnimationDidStop];
+		}
+	}
+
+	paintToolBar.alpha = alpha;
+	
+	if (animated) {
+		[UIView commitAnimations];
+	}
+}
+-(void)showOrHideTopBottom{
+	if ([self isShowingChrome]) {
+		[self showBars:NO animated:YES];
+	} else {
+		[self showBars:YES animated:NO];
+	}
+	
+}
+
+- (void)showBarsAnimationDidStop {
+	self.navigationController.navigationBarHidden = NO;
+}
+
+- (void)hideBarsAnimationDidStop {
+		
+	self.navigationController.navigationBarHidden = YES;
+}
+
+
+#pragma mark 
+#pragma mark UIImagePickerController delegate
+
+-(IBAction)changeBackground:(id)sender{
+	UIImagePickerController* picker = [[UIImagePickerController alloc] init];
+	picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+	picker.allowsEditing = YES;
+//	picker.allowsImageEditing = NO;
+	picker.delegate = self;
+	[self presentModalViewController:picker animated:YES];
+	[picker release];
+}
+
+-(void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info 
+{
+	UIImage *image = [info objectForKey: UIImagePickerControllerOriginalImage];
+	
+	NSLog(@"UIImge %@",image);
+	[UIView animateWithDuration:0.5 animations:^{
+		backgroundImageView.alpha = 0;
+	} completion:^(BOOL finished) {
+		backgroundImageView.image = image;;
+		[UIView animateWithDuration:0.5 animations:^(void) {
+			backgroundImageView.alpha = 1;
+		}];
+	}];
+
+	[self dismissModalViewControllerAnimated:NO];
+	
+}
+- (UIImage*) mergeImages:(UIImage*)bgImage hoverImage:(UIImage*)hoverImage
+{
+   CGSize size = self.view.frame.size;
+	
+	if (UIGraphicsBeginImageContextWithOptions != NULL) {
+		UIGraphicsBeginImageContextWithOptions(size, NO, self.view.contentScaleFactor);
+	} else {
+		UIGraphicsBeginImageContext(size);
+	}
+	
+   UIGraphicsBeginImageContext(size);
+
+  	[bgImage drawAtPoint:CGPointMake(0, 0)];
+	[hoverImage drawAtPoint:CGPointMake(0, 0)];
+
+
+   UIImage* result = UIGraphicsGetImageFromCurrentImageContext();
+   UIGraphicsEndImageContext();
+	
+   return result;
+}
+
+-(void)uploadPhotoToFacebook{
+		
+		
+	[self performSelectorOnMainThread:@selector(uploadphotoOnMainThread) withObject:nil waitUntilDone:NO];
+	
+}
+
+-(void)uploadphotoOnMainThread{
+	UIImage *hoverImage = [drawingView snapUIImage];
+	
+	UIGraphicsBeginImageContext(backgroundImageView.bounds.size);
+	[backgroundImageView.layer renderInContext:UIGraphicsGetCurrentContext()];
+	UIImage *bgImage = UIGraphicsGetImageFromCurrentImageContext();
+	UIGraphicsEndImageContext();
+	
+	//UIImage *bgImage = backgroundImageView.image;
+	
+	UIImage *resulImage = [self mergeImages:bgImage hoverImage:hoverImage];
+	
+	NSData *data = UIImageJPEGRepresentation(resulImage, 1); 
+	
+	
+
+	[fbAgent uploadPhotoAsData:data withCaption:@"Pathways Drawing" toAlbum:nil];
+}
+/////////////SOCIAL N/W//////////////////////////////////
+-(void)setUpSocailNetworking:(int)tag{
+	if(tag == 1){
+		if(!fbAgent){
+			fbAgent = [[FacebookAgent alloc] initWithApiKey:FBkOAuthConsumerKey 
+															  ApiSecret:FBkOAuthConsumerSecret 
+																ApiProxy:nil];
+			fbAgent.delegate = self;
+			fbAgent.shouldResumeSession = YES;
+			
+		}
+	
+		[self performSelectorInBackgroundQueue:@selector(uploadPhotoToFacebook) withObject:nil];
+	
+	} else {
+		if(!_engine){
+			_engine = [[SA_OAuthTwitterEngine alloc] initOAuthWithDelegate: self];
+			_engine.consumerKey = kOAuthConsumerKey;
+			_engine.consumerSecret = kOAuthConsumerSecret;
+		}
+		
+		UIViewController *controller = [SA_OAuthTwitterController controllerToEnterCredentialsWithTwitterEngine: _engine delegate: self];
+		
+		if (controller) 
+			[self presentModalViewController: controller animated: YES];
+		else 
+		{
+			NSString *update = @"Sanjeev";
+			[_engine sendUpdate:update];
+		}
+		
+	}
+	
+}
+- (void) facebookAgent:(FacebookAgent*)agent photoUploaded:(NSString*) pid{
+	NSLog(@"Photo Id %@",pid);
+}
+- (void) facebookAgent:(FacebookAgent*)agent requestFaild:(NSString*) message{
+	NSLog(@"requestFaild  %@",message);
+}
+/**
+ * This method is called if after login or logout
+ */
+- (void) facebookAgent:(FacebookAgent*)agent loginStatus:(BOOL) loggedIn{
+//	agent.shouldFetchUsernameAfterLogin = YES;
+}
+
+/**
+ * This method is called on dialog errors
+ */
+- (void) facebookAgent:(FacebookAgent*)agent dialog:(FBDialog*)dialog didFailWithError:(NSError*)error{
+	NSLog(@"Failed ")	;
+}
+//=============================================================================================================================
+#pragma mark SA_OAuthTwitterEngineDelegate
+- (void) storeCachedTwitterOAuthData: (NSString *) data forUsername: (NSString *) username {
+	NSUserDefaults			*defaults = [NSUserDefaults standardUserDefaults];
+	
+	[defaults setObject: data forKey: @"authData"];
+	[defaults synchronize];
+}
+
+- (NSString *) cachedTwitterOAuthDataForUsername: (NSString *) username {
+	return [[NSUserDefaults standardUserDefaults] objectForKey: @"authData"];
+}
+
+//=============================================================================================================================
+#pragma mark SA_OAuthTwitterControllerDelegate
+- (void) OAuthTwitterController: (SA_OAuthTwitterController *) controller authenticatedWithUsername: (NSString *) username {
+	NSLog(@"Authenicated for %@", username);
+}
+
+- (void) OAuthTwitterControllerFailed: (SA_OAuthTwitterController *) controller {
+	NSLog(@"Authentication Failed!");
+}
+
+- (void) OAuthTwitterControllerCanceled: (SA_OAuthTwitterController *) controller {
+	NSLog(@"Authentication Canceled.");
+}
+
+//=============================================================================================================================
+#pragma mark TwitterEngineDelegate
+- (void) requestSucceeded: (NSString *) requestIdentifier {
+	NSLog(@"Request %@ succeeded", requestIdentifier);
+}
+
+- (void) requestFailed: (NSString *) requestIdentifier withError: (NSError *) error {
+	NSLog(@"Request %@ failed with error: %@", requestIdentifier, error);
+}
+
+
+- (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation {
+    return YES;
+}
+- (void)dealloc {
+    [super dealloc];
+}
+
+@end

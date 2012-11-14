@@ -1,0 +1,62 @@
+//
+//  DrawVC.h
+//  Pathways
+//
+//  Created by iMac on 23/02/11.
+//  Copyright 2011 __MyCompanyName__. All rights reserved.
+//
+
+#import <UIKit/UIKit.h>
+#import "FacebookAgent.h"
+#import "SA_OAuthTwitterController.h"
+
+@class SA_OAuthTwitterEngine;
+@class PaintingView;
+@class SoundEffect;
+@class PaintToolBar;
+@class Brush;
+@class BrushColorPicker;
+@class DropDownView;
+@class BrushSliderView;
+
+@interface DrawVC : UIViewController<UIImagePickerControllerDelegate,UINavigationControllerDelegate,FacebookAgentDelegate, SA_OAuthTwitterControllerDelegate,FBRequestDelegate> {
+	IBOutlet PaintingView *drawingView;
+	IBOutlet PaintToolBar *paintToolBar;
+	IBOutlet BrushColorPicker *brushColorPicker;
+	IBOutlet DropDownView *dropDownView;
+	IBOutlet BrushSliderView *brushSliderView;
+	IBOutlet UIImageView *backgroundImageView;
+	IBOutlet UIImageView *undoImageView;
+	
+	SoundEffect	*erasingSound;
+	SoundEffect	*selectSound;
+	Brush *brush;
+	CFTimeInterval	lastTime;
+	
+	//Social Networking
+	FacebookAgent *fbAgent;
+	SA_OAuthTwitterEngine *_engine;
+	
+	NSMutableArray *bitMapImages;
+}
+-(void)setUpPaintToolBar;
+-(IBAction)brushesButtonAction:(id)sender;
+-(IBAction)colorButtonAction:(id)sender;
+-(IBAction)eraserButtonAction:(id)sender;
+-(IBAction)undo:(id)sender;
+-(IBAction)redo:(id)sender;
+-(IBAction)trash:(id)sender;
+-(IBAction)more:(id)sender;
+-(IBAction)changeBackground:(id)sender;
+
+
+- (void)showBarsAnimationDidStop;
+- (void)hideBarsAnimationDidStop;
+
+-(void)setUpSocailNetworking:(int)tag;
+- (UIImage*) mergeImages:(UIImage*)bgImage hoverImage:(UIImage*)hoverImage;
+
+-(void)closeBrushColorPicker;
+-(void)closeBrushSliderView;
+@end
+

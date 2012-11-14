@@ -1,0 +1,189 @@
+// !$*UTF8*$!
+{
+	1D6058900D05DD3D006BFB54 /* Pathways */ = {
+		activeExec = 0;
+		executables = (
+			948C743313449339005C86DD /* Pathways */,
+		);
+	};
+	29B97313FDCFA39411CA2CEA /* Project object */ = {
+		activeBuildConfigurationName = Debug;
+		activeExecutable = 948C743313449339005C86DD /* Pathways */;
+		activeTarget = 1D6058900D05DD3D006BFB54 /* Pathways */;
+		addToTargets = (
+			1D6058900D05DD3D006BFB54 /* Pathways */,
+		);
+		codeSenseManager = 948C74511344933E005C86DD /* Code sense */;
+		executables = (
+			948C743313449339005C86DD /* Pathways */,
+		);
+		perUserDictionary = {
+			PBXConfiguration.PBXFileTableDataSource3.PBXFileTableDataSource = {
+				PBXFileTableDataSourceColumnSortingDirectionKey = "-1";
+				PBXFileTableDataSourceColumnSortingKey = PBXFileDataSource_Filename_ColumnID;
+				PBXFileTableDataSourceColumnWidthsKey = (
+					20,
+					1473,
+					20,
+					48,
+					43,
+					43,
+					20,
+				);
+				PBXFileTableDataSourceColumnsKey = (
+					PBXFileDataSource_FiletypeID,
+					PBXFileDataSource_Filename_ColumnID,
+					PBXFileDataSource_Built_ColumnID,
+					PBXFileDataSource_ObjectSize_ColumnID,
+					PBXFileDataSource_Errors_ColumnID,
+					PBXFileDataSource_Warnings_ColumnID,
+					PBXFileDataSource_Target_ColumnID,
+				);
+			};
+			PBXPerProjectTemplateStateSaveDate = 324191167;
+			PBXWorkspaceStateSaveDate = 324191167;
+		};
+		perUserProjectItems = {
+			949916461345936300757DAF /* PBXTextBookmark */ = 949916461345936300757DAF /* PBXTextBookmark */;
+			949916471345936300757DAF /* PBXTextBookmark */ = 949916471345936300757DAF /* PBXTextBookmark */;
+			94D6CCD61352CF4E006B84B0 /* PBXTextBookmark */ = 94D6CCD61352CF4E006B84B0 /* PBXTextBookmark */;
+			94D6CCD71352CF4E006B84B0 /* XCBuildMessageTextBookmark */ = 94D6CCD71352CF4E006B84B0 /* XCBuildMessageTextBookmark */;
+			94D6CCD81352CF4E006B84B0 /* PBXTextBookmark */ = 94D6CCD81352CF4E006B84B0 /* PBXTextBookmark */;
+		};
+		sourceControlManager = 948C74501344933E005C86DD /* Source Control */;
+		userBuildSettings = {
+		};
+	};
+	32B4FB1A132DE2E800ED25FB /* MGTwitterLibXMLParser.h */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1651, 837}}";
+			sepNavSelRange = "{178, 0}";
+			sepNavVisRange = "{0, 1265}";
+		};
+	};
+	32B4FB1B132DE2E800ED25FB /* MGTwitterLibXMLParser.m */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1500, 5946}}";
+			sepNavSelRange = "{1314, 0}";
+			sepNavVisRange = "{1028, 576}";
+		};
+	};
+	32D843AC1314F98000FAE920 /* RegisterVC.h */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1651, 668}}";
+			sepNavSelRange = "{240, 25}";
+			sepNavVisRange = "{0, 328}";
+		};
+	};
+	32D843AD1314F98000FAE920 /* RegisterVC.m */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1651, 1377}}";
+			sepNavSelRange = "{1125, 0}";
+			sepNavVisRange = "{540, 1236}";
+		};
+	};
+	948C743313449339005C86DD /* Pathways */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+		);
+		argumentStrings = (
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 0;
+		configStateDict = {
+		};
+		customDataFormattersEnabled = 1;
+		dataTipCustomDataFormattersEnabled = 1;
+		dataTipShowTypeColumn = 1;
+		dataTipSortType = 0;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		enableDebugStr = 1;
+		environmentEntries = (
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		libgmallocEnabled = 0;
+		name = Pathways;
+		showTypeColumn = 0;
+		sourceDirectories = (
+		);
+	};
+	948C74501344933E005C86DD /* Source Control */ = {
+		isa = PBXSourceControlManager;
+		fallbackIsa = XCSourceControlManager;
+		isSCMEnabled = 0;
+		scmConfiguration = {
+			repositoryNamesForRoots = {
+				"" = "";
+			};
+		};
+	};
+	948C74511344933E005C86DD /* Code sense */ = {
+		isa = PBXCodeSenseManager;
+		indexTemplatePath = "";
+	};
+	9499163F1345929600757DAF /* DownloadOperation.h */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1651, 668}}";
+			sepNavSelRange = "{539, 0}";
+			sepNavVisRange = "{0, 678}";
+		};
+	};
+	949916401345929600757DAF /* DownloadOperation.m */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1651, 2116}}";
+			sepNavSelRange = "{223, 0}";
+			sepNavVisRange = "{1935, 862}";
+		};
+	};
+	949916461345936300757DAF /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 32D843AC1314F98000FAE920 /* RegisterVC.h */;
+		name = "RegisterVC.h: 12";
+		rLen = 25;
+		rLoc = 240;
+		rType = 0;
+		vrLen = 328;
+		vrLoc = 0;
+	};
+	949916471345936300757DAF /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 9499163F1345929600757DAF /* DownloadOperation.h */;
+		name = "DownloadOperation.h: 23";
+		rLen = 0;
+		rLoc = 539;
+		rType = 0;
+		vrLen = 678;
+		vrLoc = 0;
+	};
+	94D6CCD61352CF4E006B84B0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 949916401345929600757DAF /* DownloadOperation.m */;
+		name = "DownloadOperation.m: 9";
+		rLen = 0;
+		rLoc = 223;
+		rType = 0;
+		vrLen = 862;
+		vrLoc = 1935;
+	};
+	94D6CCD71352CF4E006B84B0 /* XCBuildMessageTextBookmark */ = {
+		isa = PBXTextBookmark;
+		comments = "Libxml/xmlreader.h: No such file or directory";
+		fRef = 32B4FB1A132DE2E800ED25FB /* MGTwitterLibXMLParser.h */;
+		fallbackIsa = XCBuildMessageTextBookmark;
+		rLen = 1;
+		rLoc = 9;
+		rType = 1;
+	};
+	94D6CCD81352CF4E006B84B0 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 32B4FB1A132DE2E800ED25FB /* MGTwitterLibXMLParser.h */;
+		name = "MGTwitterLibXMLParser.h: 10";
+		rLen = 0;
+		rLoc = 178;
+		rType = 0;
+		vrLen = 1265;
+		vrLoc = 0;
+	};
+}

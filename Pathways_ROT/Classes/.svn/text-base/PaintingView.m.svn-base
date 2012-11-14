@@ -1,0 +1,844 @@
+
+#import <QuartzCore/QuartzCore.h>
+#import <OpenGLES/EAGLDrawable.h>
+#import <ImageIO/ImageIO.h>
+
+#import "PaintingView.h"
+#import "Brush.h"
+#import "DropDownView.h"
+
+@interface PaintingView (private)
+
+- (BOOL)createFramebuffer;
+- (void)destroyFramebuffer;
+
+@end
+
+@implementation PaintingView
+
+@synthesize undoManager;
+@synthesize  location;
+@synthesize  previousLocation;
+@synthesize paintDelegate;
++ (Class) layerClass
+{
+	return [CAEAGLLayer class];
+}
+
+size_t			width, height;
+/* // This is Required for Video recording
+int pointsVertexLength = 20000;
+int pointsVertexCounter = 0;
+static CGPoint *pointsVertices ;
+static NSString *fileName = @"drawPath";
+
+*/
+- (id)initWithCoder:(NSCoder*)coder {
+
+	CGImageRef		brushImage;
+	CGContextRef	brushContext;
+	GLubyte			*brushData;
+    
+    if ((self = [super initWithCoder:coder])) {
+		
+		CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;
+		
+		eaglLayer.opaque = NO;
+		eaglLayer.drawableProperties = [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithBool:YES], kEAGLDrawablePropertyRetainedBacking, kEAGLColorFormatRGBA8, kEAGLDrawablePropertyColorFormat, nil];
+		
+		context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
+		
+		if (!context || ![EAGLContext setCurrentContext:context]) {
+			[self release];
+			return nil;
+		}
+		
+		
+		//Init(&esContext);
+		
+		// Create a texture from an image
+		// First create a UIImage object from the data in a image file, and then extract the Core Graphics image
+		brushImage = [UIImage imageNamed:@"Particle.png"].CGImage;
+		
+		// Get the width and height of the image
+		width = CGImageGetWidth(brushImage);
+		height = CGImageGetHeight(brushImage);
+		
+		// Texture dimensions must be a power of 2. If you write an application that allows users to supply an image,
+		// you'll want to add code that checks the dimensions and takes appropriate action if they are not a power of 2.
+		
+		// Make sure the image exists
+		if(brushImage) {
+			// Allocate  memory needed for the bitmap context
+			brushData = (GLubyte *) calloc(width * height, sizeof(GLubyte));
+
+			CGColorSpaceRef brushColorSpace = CGColorSpaceCreateDeviceGray();
+
+			brushContext = CGBitmapContextCreate(brushData, width, width, 8, width, brushColorSpace, kCGImageAlphaNone);
+			
+			
+			CGColorSpaceRelease(brushColorSpace);
+
+			// After you create the context, you can draw the  image to the context.
+			CGContextDrawImage(brushContext, CGRectMake(0.0, 0.0, (CGFloat)width, (CGFloat)height), brushImage);
+			// You don't need the context at this point, so you need to release it to avoid memory leaks.
+			CGContextRelease(brushContext);
+			// Use OpenGL ES to generate a name for the texture.
+			glGenTextures(1, &brushTexture);
+			// Bind the texture name. 
+			glBindTexture(GL_TEXTURE_2D, brushTexture);
+			// Set the texture parameters to use a minifying filter and a linear filer (weighted average)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			// Specify a 2D texture image, providing the a pointer to the image data in memory
+			
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, brushData);        
+			//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, brushData);
+			
+			
+			
+			// Release  the image data; it's no longer needed
+            free(brushData);
+		}
+		
+		
+		
+		// Set the view's scale factor
+		self.contentScaleFactor = 1.0;
+		
+		// Setup OpenGL states
+		glMatrixMode(GL_PROJECTION);
+		CGRect frame = self.bounds;
+		CGFloat scale = self.contentScaleFactor;
+		// Setup the view port in Pixels
+		glOrthof(0, frame.size.width * scale, 0, frame.size.height * scale, -1, 1);
+		glViewport(0, 0, frame.size.width * scale, frame.size.height * scale);
+		glMatrixMode(GL_MODELVIEW);
+		
+		glDisable(GL_DITHER);
+		
+		// Set a Vertix Mode type
+		glEnable(GL_TEXTURE_2D);
+		glEnableClientState(GL_VERTEX_ARRAY);
+		
+		// Set a blending function appropriate for premultiplied alpha pixel data
+	    glEnable(GL_BLEND);
+		//glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA); 
+		
+		glEnable(GL_POINT_SPRITE_OES);
+		glTexEnvf(GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE);
+		
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+		glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_ALPHA);
+
+		glPointSize(width / kBrushScale);
+
+		needsErase = YES;
+	}
+	//allLinesDrawPoints = [[NSMutableArray alloc] init];
+
+	self.backgroundColor = [UIColor clearColor];
+	//undoImageView = [[UIImageView alloc] initWithFrame:backgroundImageView.frame];
+	//[backgroundImageView insertSubview:undoImageView atIndex:0];
+	undoLayer = [[CALayer alloc] init];
+	undoLayer.frame = self.frame;
+	[self.layer insertSublayer:undoLayer atIndex:0];
+	return self;
+}
+- (void)createGLTexture:(GLuint *)texName fromCGImage:(CGImageRef)img
+{
+	GLubyte *spriteData = NULL;
+	CGContextRef spriteContext;
+	GLuint imgW, imgH, texW, texH;
+	
+	imgW = CGImageGetWidth(img);
+	imgH = CGImageGetHeight(img);
+	
+	// Find smallest possible powers of 2 for our texture dimensions
+	for (texW = 1; texW < imgW; texW *= 2) ;
+	for (texH = 1; texH < imgH; texH *= 2) ;
+	
+	// Allocated memory needed for the bitmap context
+	spriteData = (GLubyte *) calloc(texH, texW * 4);
+	// Uses the bitmatp creation function provided by the Core Graphics framework. 
+	spriteContext = CGBitmapContextCreate(spriteData, texW, texH, 8, texW * 4, CGImageGetColorSpace(img), kCGImageAlphaPremultipliedLast);
+	
+	// Translate and scale the context to draw the image upside-down (conflict in flipped-ness between GL textures and CG contexts)
+	CGContextTranslateCTM(spriteContext, 0., texH);
+	CGContextScaleCTM(spriteContext, 1., -1.);
+	
+	// After you create the context, you can draw the sprite image to the context.
+	CGContextDrawImage(spriteContext, CGRectMake(0.0, 0.0, imgW, imgH), img);
+	// You don't need the context at this point, so you need to release it to avoid memory leaks.
+	CGContextRelease(spriteContext);
+	
+	// Use OpenGL ES to generate a name for the texture.
+	glGenTextures(2, texName);
+	// Bind the texture name. 
+	glBindTexture(GL_TEXTURE_2D, *texName);
+	// Speidfy a 2D texture image, provideing the a pointer to the image data in memory
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texW, texH, 0, GL_RGBA, GL_UNSIGNED_BYTE, spriteData);
+	// Set the texture parameters to use a minifying filter and a linear filer (weighted average)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	
+	// Enable use of the texture
+	glEnable(GL_TEXTURE_2D);
+	// Set a blending function to use
+	glBlendFunc(GL_SRC_ALPHA,GL_ONE);
+	//glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	// Enable blending
+	glEnable(GL_BLEND);
+	
+	free(spriteData);
+}
+
+
+-(void)setImage:(UIImage*)aImage{
+	//undoLayer.contents = (id)aImage.CGImage;
+	
+	GLuint	newTexture;
+	[self createGLTexture:&newTexture fromCGImage:aImage.CGImage];
+	
+	glBindTexture(GL_TEXTURE_2D, brushTexture);
+	//Simply sample the texture
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
+	//------------------------
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, newTexture);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+	//Sample RGB, multiply by previous texunit result
+	glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);   //Modulate RGB with RGB
+	glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
+	glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_RGB, GL_SRC_COLOR);
+	//Sample ALPHA, multiply by previous texunit result
+	glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_MODULATE);  //Modulate ALPHA with ALPHA
+	glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
+	glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
+	
+	
+		
+}
+-(void)layoutSubviews
+{
+	[EAGLContext setCurrentContext:context];
+	[self destroyFramebuffer];
+	[self createFramebuffer];
+	
+	if (needsErase) {
+		[self erase];
+		needsErase = NO;
+	}
+}
+
+- (BOOL)createFramebuffer
+{
+	
+	glGenFramebuffersOES(1, &viewFramebuffer);
+	glGenRenderbuffersOES(1, &viewRenderbuffer);
+	
+	glBindFramebufferOES(GL_FRAMEBUFFER_OES, viewFramebuffer);
+	glBindRenderbufferOES(GL_RENDERBUFFER_OES, viewRenderbuffer);
+	// This call associates the storage for the current render buffer with the EAGLDrawable (our CAEAGLLayer)
+	// allowing us to draw into a buffer that will later be rendered to screen wherever the layer is (which corresponds with our view).
+	[context renderbufferStorage:GL_RENDERBUFFER_OES fromDrawable:(id<EAGLDrawable>)self.layer];
+	glFramebufferRenderbufferOES(GL_FRAMEBUFFER_OES, GL_COLOR_ATTACHMENT0_OES, GL_RENDERBUFFER_OES, viewRenderbuffer);
+	
+	glGetRenderbufferParameterivOES(GL_RENDERBUFFER_OES, GL_RENDERBUFFER_WIDTH_OES, &backingWidth);
+	glGetRenderbufferParameterivOES(GL_RENDERBUFFER_OES, GL_RENDERBUFFER_HEIGHT_OES, &backingHeight);
+	
+	
+	// For this sample, we also need a depth buffer, so we'll create and attach one via another renderbuffer.
+	glGenRenderbuffersOES(2, &depthRenderbuffer);
+	glBindRenderbufferOES(GL_RENDERBUFFER_OES, depthRenderbuffer);
+	glRenderbufferStorageOES(GL_RENDERBUFFER_OES, GL_DEPTH_COMPONENT16_OES, backingWidth, backingHeight);
+	glFramebufferRenderbufferOES(GL_FRAMEBUFFER_OES, GL_DEPTH_ATTACHMENT_OES, GL_RENDERBUFFER_OES, depthRenderbuffer);
+	
+	
+	
+	if(glCheckFramebufferStatusOES(GL_FRAMEBUFFER_OES) != GL_FRAMEBUFFER_COMPLETE_OES)
+	{
+		NSLog(@"failed to make complete framebuffer object %x", glCheckFramebufferStatusOES(GL_FRAMEBUFFER_OES));
+		return NO;
+	}
+	
+	return YES;
+}
+
+// Clean up any buffers we have allocated.
+- (void)destroyFramebuffer
+{
+	glDeleteFramebuffersOES(1, &viewFramebuffer);
+	viewFramebuffer = 0;
+	glDeleteRenderbuffersOES(1, &viewRenderbuffer);
+	viewRenderbuffer = 0;
+	
+	if(depthRenderbuffer)
+	{
+		glDeleteRenderbuffersOES(1, &depthRenderbuffer);
+		depthRenderbuffer = 0;
+	}
+}
+
+// Releases resources when they are not longer needed.
+- (void) dealloc
+{
+	if (brushTexture)
+	{
+		glDeleteTextures(1, &brushTexture);
+		brushTexture = 0;
+	}
+	
+	if([EAGLContext currentContext] == context)
+	{
+		[EAGLContext setCurrentContext:nil];
+	}
+	
+	[context release];
+	[super dealloc];
+}
+
+// Erases the screen
+- (void) erase
+{
+	[EAGLContext setCurrentContext:context];
+	
+	// Clear the buffer
+	glBindFramebufferOES(GL_FRAMEBUFFER_OES, viewFramebuffer);
+	glClearColor(0.0, 0.0, 0.0, 0.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+	
+	// Display the buffer
+	glBindRenderbufferOES(GL_RENDERBUFFER_OES, viewRenderbuffer);
+	[context presentRenderbuffer:GL_RENDERBUFFER_OES];
+}
+
+//////////////////TOOLBAR ACTIONS START///////////////////////
+-(IBAction)setBrush:(Brush*)aBrush{
+	if (aBrush != nil) {
+		brush = aBrush;		
+	}
+	
+	isEraseMode = FALSE;
+	
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	
+	const CGFloat *components = CGColorGetComponents(brush.brushColor.CGColor);
+	glColor4f(components[0]	* kBrushOpacity, components[1] * kBrushOpacity,  components[2]	* kBrushOpacity,  components[3]*kBrushOpacity);
+	
+	glClearColor(0,0,0,0);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	CGImageRef brushImage = [UIImage imageNamed:@"Particle.png"].CGImage;
+	size_t width = CGImageGetWidth(brushImage);
+	glPointSize((width/ kBrushScale)*[brush.brushSize intValue]/4);
+}
+-(IBAction)eraserButtonAction:(id)sender{
+
+	isEraseMode = !isEraseMode;
+	//TODO : SET Context redo	
+}
+-(IBAction)trash:(id)sender{
+
+	/* // This is for Video Recording
+	NSURL *dURL = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
+	
+	NSString* cachePath = [[dURL path] stringByAppendingPathComponent:fileName];
+	
+	NSMutableArray *recordedPaths = [NSMutableArray arrayWithContentsOfFile:cachePath];
+	
+	if([recordedPaths count])
+	{
+		[recordedPaths removeAllObjects];
+		
+		[recordedPaths writeToURL:[NSURL fileURLWithPath:cachePath] atomically:YES];
+	}
+	*/
+	[self erase];
+}
+
+// Drawings a line onscreen based on where the user touches
+
+- (void) renderLineFromPoint:(CGPoint)start toPoint:(CGPoint)end mode:(BOOL)isErase
+{
+	static GLfloat*		vertexBuffer = NULL;
+	static NSUInteger	vertexMax = 64;
+	NSUInteger			vertexCount = 0,count,i;
+	
+	[EAGLContext setCurrentContext:context];
+	glBindFramebufferOES(GL_FRAMEBUFFER_OES, viewFramebuffer);
+	
+	// Convert locations from Points to Pixels
+	CGFloat scale = self.contentScaleFactor;
+	start.x *= scale;
+	start.y *= scale;
+	end.x *= scale;
+	end.y *= scale;
+	
+
+	if(vertexBuffer == NULL)
+		vertexBuffer = malloc(vertexMax * 2 * sizeof(GLfloat));
+		
+	count = MAX(ceilf(sqrtf((end.x - start.x) * (end.x - start.x) + (end.y - start.y) * (end.y - start.y)) / kBrushPixelStep), 1);
+
+	for(i = 0; i < count; ++i) {
+		if(vertexCount == vertexMax) {
+			vertexMax = 2 * vertexMax;
+			vertexBuffer = realloc(vertexBuffer, vertexMax * 2 * sizeof(GLfloat));
+		}
+		
+		vertexBuffer[2 * vertexCount + 0] = start.x + (end.x - start.x) * ((GLfloat)i / (GLfloat)count);
+		vertexBuffer[2 * vertexCount + 1] = start.y + (end.y - start.y) * ((GLfloat)i / (GLfloat)count);
+		
+		vertexCount += 1;
+	}
+
+	glVertexPointer(2, GL_FLOAT, 0, vertexBuffer);
+	glDrawArrays(GL_POINTS, 0, vertexCount);
+	
+	if (isErase) {
+		glBlendFunc(GL_ONE, GL_ZERO);
+		glColor4f(0, 0, 0, 0.0);
+	} else {
+		
+		/* // Video Recording
+		 
+		if(pointsVertices == NULL){
+			pointsVertices =  malloc( sizeof(CGPoint) * pointsVertexLength*2);
+		}
+		
+		NSLog(@"%d Location %@, %@",pointsVertexCounter,NSStringFromCGPoint(start),NSStringFromCGPoint(end));
+
+		pointsVertices[2*pointsVertexCounter+0] = start;
+		pointsVertices[2*pointsVertexCounter+1] = end;
+		
+		 */
+		
+		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		[self setBrush:brush];
+	}
+	
+	glBindRenderbufferOES(GL_RENDERBUFFER_OES, viewRenderbuffer);
+	[context presentRenderbuffer:GL_RENDERBUFFER_OES];
+}
+
+
+- (void) renderLineFromPointForUndo:(CGPoint)start toPoint:(CGPoint)end
+{
+	static GLfloat*		vertexBuffer = NULL;
+	static NSUInteger	vertexMax = 64;
+	NSUInteger			vertexCount = 0,count,i;
+	
+	[EAGLContext setCurrentContext:context];
+	glBindFramebufferOES(GL_FRAMEBUFFER_OES, viewFramebuffer);
+	
+	// Convert locations from Points to Pixels
+	CGFloat scale = self.contentScaleFactor;
+	start.x *= scale;
+	start.y *= scale;
+	end.x *= scale;
+	end.y *= scale;
+	
+	
+	if(vertexBuffer == NULL)
+		vertexBuffer = malloc(vertexMax * 2 * sizeof(GLfloat));
+	
+	count = MAX(ceilf(sqrtf((end.x - start.x) * (end.x - start.x) + (end.y - start.y) * (end.y - start.y)) / kBrushPixelStep), 1);
+	
+	for(i = 0; i < count; ++i) {
+		if(vertexCount == vertexMax) {
+			vertexMax = 2 * vertexMax;
+			vertexBuffer = realloc(vertexBuffer, vertexMax * 2 * sizeof(GLfloat));
+		}
+		
+		vertexBuffer[2 * vertexCount + 0] = start.x + (end.x - start.x) * ((GLfloat)i / (GLfloat)count);
+		vertexBuffer[2 * vertexCount + 1] = start.y + (end.y - start.y) * ((GLfloat)i / (GLfloat)count);
+		
+		vertexCount += 1;
+	}
+	
+	glVertexPointer(2, GL_FLOAT, 0, vertexBuffer);
+	glDrawArrays(GL_POINTS, 0, vertexCount);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	
+	glBindRenderbufferOES(GL_RENDERBUFFER_OES, viewRenderbuffer);
+	[context presentRenderbuffer:GL_RENDERBUFFER_OES];
+}
+
+
+- (void) playback:(NSMutableArray*)recordedPaths
+{
+	NSData*				data = [recordedPaths objectAtIndex:0];
+	CGPoint*			point = (CGPoint*)[data bytes];
+	NSUInteger			count = [data length] / sizeof(CGPoint),
+	i;
+	
+	//NSLog(@"Lat Counter %d, Size of the draw %d",pointsVertexCounter,count);
+	
+	// Render the current path
+	for(i = 0; i < count - 1; ++i, ++point){
+		[self renderLineFromPointForUndo:*point toPoint:*(point + 1)];		
+		
+		//NSLog(@"UNDO : %d Location %@, %@",i,NSStringFromCGPoint(*point),NSStringFromCGPoint(*(point+1)));;
+		
+	}
+	
+	[recordedPaths removeObjectAtIndex:0];
+	
+	if([recordedPaths count])
+		[self performSelector:@selector(playback:) withObject:recordedPaths afterDelay:0.01];
+}
+
+
+-(IBAction)undo:(id)sender{
+
+	[self erase];
+	
+	/* // Video Recording
+	 
+	NSURL *dURL = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
+	
+	NSString* cachePath = [[dURL path] stringByAppendingPathComponent:fileName];
+	
+	NSMutableArray *recordedPaths = [NSMutableArray arrayWithContentsOfFile:cachePath];
+	
+	if([recordedPaths count])
+	{
+		[recordedPaths removeLastObject];
+
+		[recordedPaths writeToURL:[NSURL fileURLWithPath:cachePath] atomically:YES];
+
+		if([recordedPaths count])
+		{
+			[self playback:recordedPaths];
+		}
+	}
+	 */
+}
+
+//////////////////TOOLBAR ACTIONS END///////////////////////
+
+
+#pragma mark Touches hadling
+BOOL isTouchesMoved = FALSE;
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+{
+	/* Video Recording
+	 pointsVertexCounter = 0;
+	*/	
+	isTouchesMoved = FALSE;
+	
+	CGFloat	thisHieght = CGRectGetHeight(self.bounds);
+	
+    UITouch* touch = [[event touchesForView:self] anyObject];
+	
+	firstTouch = YES;
+
+	location = [touch locationInView:self];
+	location.y = thisHieght - location.y;
+}
+
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
+{  
+	isTouchesMoved = YES;
+	
+	
+	CGFloat	thisHieght = CGRectGetHeight(self.bounds);
+	UITouch *touch = [[event touchesForView:self] anyObject];
+	if (firstTouch) {
+	
+		firstTouch = NO;
+	
+		previousLocation = [touch previousLocationInView:self];
+		previousLocation.y = thisHieght - previousLocation.y;
+
+	} else {
+		
+		location = [touch locationInView:self];
+	    location.y = thisHieght - location.y;
+		
+		previousLocation = [touch previousLocationInView:self];
+		previousLocation.y = thisHieght - previousLocation.y;
+	}
+
+	[self renderLineFromPoint:previousLocation toPoint:location mode:isEraseMode];
+	
+	/* Video Recording
+	pointsVertexCounter++;
+	*/
+
+}
+
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+{
+	
+	if (!isTouchesMoved) {
+		[paintDelegate performSelector:@selector(showOrHideTopBottom)];		
+	}
+	
+	CGFloat	thisHieght = CGRectGetHeight(self.bounds);
+
+    UITouch* touch = [[event touchesForView:self] anyObject];
+
+	if (firstTouch) {
+
+		firstTouch = NO;
+	
+		previousLocation = [touch previousLocationInView:self];
+		previousLocation.y = thisHieght - previousLocation.y;
+
+		[self renderLineFromPoint:previousLocation toPoint:location mode:isEraseMode];
+
+		/* Video Recording
+		 pointsVertexCounter++;
+		 */
+		
+	}
+	UIImage *hoverImage = [self snapUIImage];
+	[paintDelegate performSelector:@selector(saveSnapShot:) withObject:hoverImage];		
+
+	
+	
+	/*
+	int lenghtRead = pointsVertexCounter;
+	NSData *verticesObject =[NSData dataWithBytes:pointsVertices length:( sizeof(CGPoint) * lenghtRead*2)];
+	
+	
+	NSData*			data = verticesObject;
+	CGPoint*			point = pointsVertices;
+	NSUInteger			count = [data length] / sizeof(CGPoint),
+	i;
+	
+	//NSLog(@"Lat Counter %d, Size of the draw %d",pointsVertexCounter,count);
+	
+	// Render the current path
+	for(i = 0; i < count - 1; ++i, ++point){
+		
+		NSLog(@"T END :  %d Location %@, %@",i,NSStringFromCGPoint(*point),NSStringFromCGPoint(*(point+1)));;
+		
+	}
+	
+
+	NSURL *dURL = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
+	NSString* cachePath = [[dURL path] stringByAppendingPathComponent:fileName];
+	NSFileManager* fm = [NSFileManager defaultManager];
+	
+	if (![fm fileExistsAtPath:[dURL path]]) {
+		[fm createFileAtPath:cachePath contents:verticesObject attributes:nil];
+	}
+	
+	NSArray *old = [NSArray arrayWithContentsOfURL:[NSURL fileURLWithPath:cachePath]];
+	
+	NSMutableArray *obj;
+
+	if (old != nil) {
+		obj = [[NSMutableArray alloc] initWithArray:old];	
+	} else {
+		obj = [[NSMutableArray alloc] initWithArray:old];
+	}
+
+	[obj addObject:verticesObject];
+	
+	
+	[obj writeToURL:[NSURL fileURLWithPath:cachePath] atomically:YES];
+	[obj release];
+*/
+	/*
+	NSArray *old = [NSArray arrayWithContentsOfURL:[NSURL fileURLWithPath:cachePath]];
+	NSMutableArray *obj = [[NSMutableArray alloc] initWithArray:old];
+	[obj addObject:verticesObject];
+	[obj writeToURL:[NSURL fileURLWithPath:cachePath] atomically:YES];
+	[obj release];
+	 */
+//	[verticesObject writeToURL:[NSURL fileURLWithPath:cachePath] atomically:YES];
+	
+	//[allLinesDrawPoints addObject:singleLinePoints];
+
+}
+-(void)saveSnapShot{
+	NSInteger myDataLength = width * height * 4; 
+	// allocate array and read pixels into it. 
+	GLubyte *buffer = (GLubyte *) malloc(myDataLength); 
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+	
+	// gl renders "upside down" so swap top to bottom into new array. 
+	// there's gotta be a better way, but this works. 
+	GLubyte *buffer2 = (GLubyte *) malloc(myDataLength);
+	
+	for(int y = 0; y < height; y++) 
+	{ 
+		for(int x = 0; x  <width * 4; x++) { 
+			buffer2[(height-1 - y) * width * 4 + x] = buffer[y * 4 * width + x];
+		} 
+	} 
+	// make data provider with data. 
+	CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, buffer2, myDataLength, NULL); 
+	// prep the ingredients 
+	int bitsPerComponent = 8; 
+	int bitsPerPixel = 32; 
+	int bytesPerRow = 4 * width; 
+	CGColorSpaceRef colorSpaceRef = CGColorSpaceCreateDeviceRGB(); 
+	CGBitmapInfo bitmapInfo = kCGBitmapByteOrderDefault; 
+	CGColorRenderingIntent renderingIntent = kCGRenderingIntentDefault; 
+	// make the cgimage 
+	CGImageRef imageRef = CGImageCreate(width, height, bitsPerComponent, bitsPerPixel, bytesPerRow, colorSpaceRef, bitmapInfo, provider, NULL, NO, renderingIntent); 
+	// then make the uiimage from that 
+	//UIImage *myImage = [UIImage imageWithCGImage:imageRef]; 
+	
+	CGImageRelease(imageRef);
+	CGColorSpaceRelease(colorSpaceRef);
+	CGDataProviderRelease(provider);
+}
+void writeImageToPath(CGImageRef layerImage, const char* path) {
+	CFStringRef pathString =
+	CFStringCreateWithCString(NULL, path, kCFStringEncodingUTF8);
+	CFURLRef url =
+	CFURLCreateWithFileSystemPath(NULL, pathString, kCFURLPOSIXPathStyle, false);	
+	/*
+	CFDictionaryRef options =
+	CFDictionaryCreate(NULL, NULL, NULL, 0, NULL, NULL);
+	CGImageDestinationRef
+	CGImageDestinationRef imageDest =
+	CGImageDestinationCreateWithURL(url, kUTTypeTIFF, 1, NULL);
+	CGImageDestinationAddImage(imageDest, layerImage, options);
+	CGImageDestinationFinalize(imageDest);
+	
+	
+	CFRelease(imageDest);
+	CFRelease(options);
+	 */
+	
+	CFRelease(url);
+	CFRelease(pathString);
+}
+
+// Handles the end of a touch event.
+- (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
+{
+	// If appropriate, add code necessary to save the state of the application.
+	// This application is not saving state.
+}
+
+#pragma mark ScreenShot
+
+CGImageRef CopyImageAndAddAlphaChannel(CGImageRef sourceImage) {
+	CGImageRef retVal = NULL;
+	size_t width = CGImageGetWidth(sourceImage); 
+	size_t height = CGImageGetHeight(sourceImage);
+	CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+	CGContextRef offscreenContext = CGBitmapContextCreate(NULL, width, height, 8, 0, colorSpace, kCGImageAlphaOnly);
+	
+	if (offscreenContext != NULL) {
+		CGContextDrawImage(offscreenContext, CGRectMake(0, 0, width, height), sourceImage);
+		retVal = CGBitmapContextCreateImage(offscreenContext);
+		CGContextRelease(offscreenContext);
+	}
+	CGColorSpaceRelease(colorSpace);
+	return retVal;
+}
+
+- (UIImage*)maskImage:(UIImage *)image withMask:(UIImage *)maskImage {
+	
+	CGImageRef maskRef = maskImage.CGImage; 
+	CGImageRef mask = CGImageMaskCreate(CGImageGetWidth(maskRef),
+										CGImageGetHeight(maskRef),
+										CGImageGetBitsPerComponent(maskRef), 
+										CGImageGetBitsPerPixel(maskRef),
+										CGImageGetBytesPerRow(maskRef), 
+										CGImageGetDataProvider(maskRef),
+										NULL,
+										false);
+	
+	CGImageRef sourceImage = [image CGImage];
+	CGImageRef imageWithAlpha = sourceImage; 
+	
+	if ((CGImageGetAlphaInfo(sourceImage) == kCGImageAlphaNone) || (CGImageGetAlphaInfo(sourceImage) == kCGImageAlphaNoneSkipFirst)) {
+		imageWithAlpha = CopyImageAndAddAlphaChannel(sourceImage);
+	}
+	
+	CGImageRef masked = CGImageCreateWithMask(mask,imageWithAlpha); 
+	CGImageRelease(mask);
+	
+	if (sourceImage != imageWithAlpha) {
+		CGImageRelease(imageWithAlpha);
+	}
+	UIImage* retImage = [UIImage imageWithCGImage:masked]; CGImageRelease(masked);
+	return retImage;
+}
+
+-(UIImage*)snapUIImage{
+	
+    glBindRenderbufferOES(GL_RENDERBUFFER_OES, viewRenderbuffer);
+    glGetRenderbufferParameterivOES(GL_RENDERBUFFER_OES, GL_RENDERBUFFER_WIDTH_OES, &backingWidth);
+    glGetRenderbufferParameterivOES(GL_RENDERBUFFER_OES, GL_RENDERBUFFER_HEIGHT_OES, &backingHeight);
+	
+    NSInteger x = 0, y = 0, width = backingWidth, height = backingHeight;
+    NSInteger dataLength = width * height * 4;
+    GLubyte *data = (GLubyte*)malloc(dataLength * sizeof(GLubyte));
+	
+    // Read pixel data from the framebuffer
+    glPixelStorei(GL_PACK_ALIGNMENT, 4);
+    glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	
+    // Create a CGImage with the pixel data
+    // If your OpenGL ES content is opaque, use kCGImageAlphaNoneSkipLast to ignore the alpha channel
+    // otherwise, use kCGImageAlphaPremultipliedLast
+    CGDataProviderRef ref = CGDataProviderCreateWithData(NULL, data, dataLength, NULL);
+    CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceRGB();
+    CGImageRef iref = CGImageCreate(width, height, 8, 32, width * 4, colorspace, kCGBitmapByteOrder32Big | kCGImageAlphaPremultipliedLast,ref, NULL, true, kCGRenderingIntentDefault);
+	
+    // OpenGL ES measures data in PIXELS
+    // Create a graphics context with the target size measured in POINTS
+    NSInteger widthInPoints, heightInPoints;
+    if (NULL != UIGraphicsBeginImageContextWithOptions) {
+        // On iOS 4 and later, use UIGraphicsBeginImageContextWithOptions to take the scale into consideration
+        // Set the scale parameter to your OpenGL ES view's contentScaleFactor
+        // so that you get a high-resolution snapshot when its value is greater than 1.0
+        CGFloat scale = self.contentScaleFactor;
+        widthInPoints = width / scale;
+        heightInPoints = height / scale;
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(widthInPoints, heightInPoints), NO, scale);
+    }
+    else {
+        // On iOS prior to 4, fall back to use UIGraphicsBeginImageContext
+        widthInPoints = width;
+        heightInPoints = height;
+        UIGraphicsBeginImageContext(CGSizeMake(widthInPoints, heightInPoints));
+    }
+	
+    CGContextRef cgcontext = UIGraphicsGetCurrentContext();
+	
+    // UIKit coordinate system is upside down to GL/Quartz coordinate system
+    // Flip the CGImage by rendering it to the flipped bitmap context
+    // The size of the destination area is measured in POINTS
+    CGContextSetBlendMode(cgcontext, kCGBlendModeCopy);
+    CGContextDrawImage(cgcontext, CGRectMake(0.0, 0.0, widthInPoints, heightInPoints), iref);
+	
+    // Retrieve the UIImage from the current context
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+	
+    UIGraphicsEndImageContext();
+	
+    // Clean up
+    free(data);
+    CFRelease(ref);
+    CFRelease(colorspace);
+    CGImageRelease(iref);
+	
+	/*
+	 UIGraphicsBeginImageContext(self.bounds.size); 
+	 
+	 [self.layer renderInContext:UIGraphicsGetCurrentContext()]; 
+	 
+	 UIImage *viewImage = UIGraphicsGetImageFromCurrentImageContext(); 
+	 
+	 UIGraphicsEndImageContext();
+	 
+	 UIImage *retImage = [self maskImage:viewImage withMask:image];
+	 */
+    return image;
+	
+}
+
+
+@end

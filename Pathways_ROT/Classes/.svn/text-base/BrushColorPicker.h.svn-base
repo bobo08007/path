@@ -1,0 +1,24 @@
+//
+//  BrushColorPicker.h
+//  Pathways
+//
+//  Created by iMac on 18/03/11.
+//  Copyright 2011 __MyCompanyName__. All rights reserved.
+//
+
+#import <UIKit/UIKit.h>
+#import "ColorPickerView.h"
+
+@class Brush;
+@interface BrushColorPicker : UIView{
+	Brush *brush;
+	ColorPickerView *colorPicker;
+	//UISlider *slider;
+	//	UIButton *sizeButton;
+	//	UIButton *colorButton;
+	UIButton *closeButton;
+	id bcDelegate;
+}
+@property(assign) 	id bcDelegate;
+-(void)setBrush:(Brush*)aBrush;
+@end

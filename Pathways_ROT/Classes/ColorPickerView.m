@@ -1,0 +1,399 @@
+//
+//  ColorPickerView.m
+//  Pathways
+//
+//  Created by iMac on 09/03/11.
+//  Copyright 2011 __MyCompanyName__. All rights reserved.
+//
+
+#import "ColorPickerView.h"
+
+@implementation ColorPickerView
+@synthesize delegate;
+
+- (id)initWithFrame:(CGRect)frame {
+
+    self = [super initWithFrame:frame];
+	
+    if (self) {
+		
+		self.backgroundColor = [UIColor clearColor];
+
+		brightnessBarImage = [[UIImage imageNamed:@"brightness.png"] retain];
+		brightnessIndicatorImage = [[UIImage imageNamed:@"bar_select.png"] retain];
+		colorWheelImage = [[UIImage imageNamed:@"wheel.png"] retain];
+		
+		
+		colorWheelFrame = CGRectMake(10, 10, colorWheelImage.size.width, colorWheelImage.size.width);
+		
+		brightnessBarFrame.origin.x = CGRectGetWidth(colorWheelFrame)+20;
+		brightnessBarFrame.origin.y = CGRectGetMinY(colorWheelFrame);
+		brightnessBarFrame.size.width = brightnessBarImage.size.width;
+		brightnessBarFrame.size.height = brightnessBarImage.size.height;
+
+		brightnessIndicatorFrame.origin.x = brightnessBarFrame.origin.x-brightnessIndicatorImage.size.width+5;
+		brightnessIndicatorFrame.origin.y = brightnessBarFrame.origin.y;
+		brightnessIndicatorFrame.size.width = brightnessIndicatorImage.size.width ;
+		brightnessIndicatorFrame.size.height = brightnessIndicatorImage.size.height ;
+		
+		//brightnessBarFrame =CGRectUnion(brightnessBarFrame, brightnessIndicatorFrame);
+        isForBrush = TRUE;
+		selectedPoint.x =selectedPointBrush.x = 150;
+		selectedPoint.y =selectedPointBrush.y= 286;
+        selectedPointBGColor.x =selectedPointBGColor.y= 200;
+
+		brightnessPCT = 1;
+		
+		
+		wheelAdjusted = [[colorWheelImage imageBitmapRep] retain];
+
+		[self setBrightness:brightnessPCT];
+		
+		drawsSquareIndicator = YES;
+    }
+    return self;
+}
+- (id)initWithCoder:(NSCoder *)aDecoder {
+	if (self = [super initWithCoder:aDecoder]) {
+		
+		CGRect frame = self.frame;
+		[self setFrame:frame];
+		self.backgroundColor = [UIColor clearColor];
+        
+		brightnessBarImage = [[UIImage imageNamed:@"brightness.png"] retain];
+		brightnessIndicatorImage = [[UIImage imageNamed:@"bar_select.png"] retain];
+		colorWheelImage = [[UIImage imageNamed:@"wheel.png"] retain];
+		
+		
+		colorWheelFrame = CGRectMake(10, 10, colorWheelImage.size.width / 2, colorWheelImage.size.width / 2);
+		
+		brightnessBarFrame.origin.x = CGRectGetWidth(colorWheelFrame)+20;
+		brightnessBarFrame.origin.y = CGRectGetMinY(colorWheelFrame);
+		brightnessBarFrame.size.width = brightnessBarImage.size.width;
+		brightnessBarFrame.size.height = brightnessBarImage.size.height;
+        
+		brightnessIndicatorFrame.origin.x = brightnessBarFrame.origin.x-10;
+		brightnessIndicatorFrame.origin.y = brightnessBarFrame.origin.y;
+		brightnessIndicatorFrame.size.width = brightnessIndicatorImage.size.width+5 ;
+		brightnessIndicatorFrame.size.height = brightnessIndicatorImage.size.height ;
+		
+		isForBrush = TRUE;
+		selectedPoint.x =selectedPointBrush.x = 150;
+		selectedPoint.y =selectedPointBrush.y= 286;
+        selectedPointBGColor.x =selectedPointBGColor.y= 200;
+        
+        brightnessPCT = 1;
+		
+		
+		wheelAdjusted = [[colorWheelImage imageBitmapRep] retain];
+		
+		[self setBrightness:brightnessPCT];
+		
+		drawsSquareIndicator = YES;
+		
+		
+		
+		if ([aDecoder decodeObjectForKey:@"selectedPoint"]) {
+			selectedPoint = CGPointFromString([aDecoder decodeObjectForKey:@"selectedPoint"]);
+			[self setBrightness:[aDecoder decodeFloatForKey:@"brightness"]];
+		}
+		
+	}
+	return self;
+}
+
+-(void)colorPickerFor:(BOOL)isBrush{
+    
+    isForBrush = isBrush;
+    
+    if (isBrush) {
+        CGFloat color[4];
+        
+        [wheelAdjusted getPixel:color atX:selectedPointBrush.x y:selectedPointBrush.y];
+        
+        NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+        if (color[3] > 0.9) {
+            color[3] = 1;
+            selectedPoint = selectedPointBrush;
+
+            UIColor * newColor = [UIColor colorWithRed:color[0]
+                                                 green:color[1] 
+                                                  blue:color[2] alpha:color[3]];
+            [lastColor release];
+            lastColor = [newColor retain];
+            [delegate colorChanged:newColor];
+        }
+        [self setNeedsDisplay];
+        [pool drain];
+    } else {
+        CGFloat color[4];
+        
+        [wheelAdjusted getPixel:color atX:selectedPointBGColor.x y:selectedPointBGColor.y];
+        
+        NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+        if (color[3] > 0.9) {
+            color[3] = 1;
+            selectedPoint = selectedPointBGColor;
+            UIColor * newColor = [UIColor colorWithRed:color[0]
+                                                 green:color[1] 
+                                                  blue:color[2] alpha:color[3]];
+            [lastColor release];
+            lastColor = [newColor retain];
+            [delegate colorChanged:newColor];
+        }
+        [self setNeedsDisplay];
+        [pool drain];
+    }
+}
+
+
+- (void)encodeWithCoder:(NSCoder *)aCoder {
+	// encode ourselves with a nice coder.
+	[super encodeWithCoder:aCoder];
+	[aCoder encodeObject:NSStringFromCGPoint(selectedPoint)
+				  forKey:@"selectedPoint"];
+	[aCoder encodeFloat:[self brightness]
+				 forKey:@"brightness"];
+}
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+	
+	CGPoint p = [[touches anyObject] locationInView:self];
+	
+	NSLog(@"Start %@",NSStringFromCGPoint(p));
+
+	if (CGRectContainsPoint(brightnessBarFrame, p)) {
+		
+		CGPoint colorP = p;
+		colorP.x -= brightnessBarFrame.origin.x;
+		colorP.y -= brightnessBarFrame.origin.y;
+		
+		brightnessPCT = brightnessBarFrame.size.height - colorP.y;
+		brightnessPCT /= brightnessBarFrame.size.height;
+		
+		brightnessIndicatorFrame.origin.y = colorP.y;
+		
+		[self setBrightness:brightnessPCT];
+		
+	} else if (CGRectContainsPoint(colorWheelFrame, p)) {
+	
+		CGPoint colorP = p;
+		colorP.x -= colorWheelFrame.origin.x;
+		colorP.y -= colorWheelFrame.origin.y;
+		colorP.x *= 2;
+		colorP.y *= 2;
+		
+		
+		
+		CGFloat color[4];
+		[wheelAdjusted getPixel:color atX:colorP.x y:colorP.y];
+		NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+		if (color[3] > 0.9) {
+			color[3] = 1;
+			selectedPoint.x = colorP.x;
+			selectedPoint.y = colorP.y;
+			UIColor * newColor = [UIColor colorWithRed:color[0]
+												 green:color[1] 
+												  blue:color[2] alpha:color[3]];
+			[lastColor release];
+			lastColor = [newColor retain];
+			[delegate colorChanged:newColor];
+		}
+		[self setNeedsDisplay];
+		[pool drain];
+	}
+}
+
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+	
+	CGPoint p = [[touches anyObject] locationInView:self];
+	
+	NSLog(@"Move %@",NSStringFromCGPoint(p));
+	
+	if (CGRectContainsPoint(brightnessBarFrame, p)) {
+		CGPoint colorP = p;
+		colorP.x -= brightnessBarFrame.origin.x;
+		colorP.y -= brightnessBarFrame.origin.y;
+		brightnessPCT = brightnessBarFrame.size.height - colorP.y;
+		brightnessPCT /= brightnessBarFrame.size.height;
+		
+		brightnessIndicatorFrame.origin.y = colorP.y;
+		
+		[self setBrightness:brightnessPCT];
+	} else if (CGRectContainsPoint(colorWheelFrame, p)) {
+		CGPoint colorP = p;
+		colorP.x -= colorWheelFrame.origin.x;
+		colorP.y -= colorWheelFrame.origin.y;
+		colorP.x *= 2;
+		colorP.y *= 2;
+		
+		
+		
+		CGFloat color[4];
+		[wheelAdjusted getPixel:color atX:colorP.x y:colorP.y];
+		NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+		if (color[3] > 0.9) {
+			color[3] = 1;
+			selectedPoint = colorP;
+			UIColor * newColor = [UIColor colorWithRed:color[0]
+												 green:color[1] 
+												  blue:color[2] alpha:color[3]];
+			[lastColor release];
+			lastColor = [newColor retain];
+			[delegate colorChanged:newColor];
+		}
+		[self setNeedsDisplay];
+		[pool drain];
+	}
+}
+
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+{
+
+	CGPoint p = [[touches anyObject] locationInView:self];
+
+	NSLog(@"End %@",NSStringFromCGPoint(p));
+	
+	if (CGRectContainsPoint(brightnessBarFrame, p)) {
+		
+		CGPoint colorP = p;
+		colorP.x -= brightnessBarFrame.origin.x;
+		colorP.y -= brightnessBarFrame.origin.y;
+		
+		brightnessPCT = brightnessBarFrame.size.height - colorP.y;
+		brightnessPCT /= brightnessBarFrame.size.height;
+		
+		brightnessIndicatorFrame.origin.y = colorP.y;
+		
+		[self setBrightness:brightnessPCT];
+	
+	} else if (CGRectContainsPoint(colorWheelFrame, p)) {
+		
+		CGPoint colorP = p;
+		colorP.x -= colorWheelFrame.origin.x;
+		colorP.y -= colorWheelFrame.origin.y;
+		colorP.x *= 2;
+		colorP.y *= 2;
+		
+		NSLog(@"colorP %@",NSStringFromCGPoint(colorP));
+
+		CGFloat color[4];
+		
+		[wheelAdjusted getPixel:color atX:colorP.x y:colorP.y];
+		
+		NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+		if (color[3] > 0.9) {
+			color[3] = 1;
+			selectedPoint = colorP;
+			UIColor * newColor = [UIColor colorWithRed:color[0]
+												 green:color[1] 
+												  blue:color[2] alpha:color[3]];
+			[lastColor release];
+			lastColor = [newColor retain];
+			[delegate colorChanged:newColor];
+		}
+		[self setNeedsDisplay];
+		[pool drain];
+	}
+}
+#pragma mark Custom Getters and Setters
+
+- (void)setBrightness:(float)_brightness {
+
+	[wheelAdjusted release];
+	
+	ANImageBitmapRep * newImage = [[colorWheelImage imageBitmapRep] retain];
+	brightnessPCT = _brightness;
+	[newImage setBrightness:brightnessPCT];
+	
+	wheelAdjusted = newImage;
+	
+	// get the color that we have selected, and apply our brightnessBarImage.
+	// then send a nice color message.
+	CGFloat color[4];
+	[wheelAdjusted getPixel:color atX:selectedPoint.x y:selectedPoint.y];
+	// use autorelease so that our autoreleased colors
+	// do in fact get released.
+	NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+	if (color[3] > 0.9) {
+		color[3] = 1;
+		UIColor * newColor = [UIColor colorWithRed:color[0]
+											 green:color[1] 
+											  blue:color[2] alpha:color[3]];
+		[lastColor release];
+		lastColor = [newColor retain];
+		[delegate colorChanged:newColor];
+	}
+	[pool drain];
+	
+	[self setNeedsDisplay];
+}
+- (float)brightness {
+	return brightnessPCT;
+}
+
+- (BOOL)drawsSquareIndicator {
+	return drawsSquareIndicator;
+}
+- (void)setDrawsSquareIndicator:(BOOL)b {
+	drawsSquareIndicator = b;
+	[self setNeedsDisplay];
+}
+
+- (UIColor *)color {
+	return lastColor;
+}
+- (void)setColor:(UIColor*)color{
+	lastColor = [color retain];
+}
+- (void)drawRect:(CGRect)rect {
+    
+    if(isForBrush){
+        selectedPointBrush = selectedPoint;
+    } else{
+        selectedPointBGColor = selectedPoint;
+    }
+    
+	[lastColor set];	
+	UIBezierPath *rectsbyroundtop = [UIBezierPath bezierPathWithRoundedRect:rect byRoundingCorners:UIRectCornerAllCorners cornerRadii:CGSizeMake(5, 5)];
+    [rectsbyroundtop fill];
+	
+	[brightnessBarImage drawInRect:brightnessBarFrame];
+	[wheelAdjusted drawInRect:colorWheelFrame];
+	[brightnessIndicatorImage drawInRect:brightnessIndicatorFrame];
+
+	const CGFloat *pxl = CGColorGetComponents(lastColor.CGColor);
+	
+	NSLog(@"B Color %f,%f,%f,%f",pxl[0],pxl[1],pxl[2],pxl[3]);
+	
+	// draw a square around selected point
+	if (drawsSquareIndicator) {
+		CGPoint selPoint = selectedPoint;
+		selPoint.x /= 2;
+		selPoint.y /= 2;
+		selPoint.x += colorWheelFrame.origin.x;
+		selPoint.y += colorWheelFrame.origin.y;
+		
+		CGContextRef ctx = UIGraphicsGetCurrentContext();
+		
+		CGContextSetStrokeColorWithColor(ctx, [[UIColor blackColor] CGColor]);
+		CGContextSetFillColorWithColor(ctx, [lastColor CGColor]);
+		
+		UIBezierPath *rectsbyroundtop = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(selPoint.x - 4, selPoint.y - 4, 10, 10) byRoundingCorners:UIRectCornerAllCorners cornerRadii:CGSizeMake(5, 5)];
+		[rectsbyroundtop fill];
+		[rectsbyroundtop stroke];
+	}
+	
+}
+
+
+- (void)dealloc {
+	[colorWheelImage release];
+	[brightnessBarImage release];
+	[wheelAdjusted release];
+	[lastColor release];
+    [super dealloc];
+}
+
+
+@end

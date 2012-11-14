@@ -1,0 +1,88 @@
+//
+//  BrushColorPicker.m
+//  Pathways
+//
+//  Created by iMac on 18/03/11.
+//  Copyright 2011 __MyCompanyName__. All rights reserved.
+//
+
+#import "BrushColorPicker.h"
+#import "Brush.h"
+#import "FTAnimation.h"
+
+#define kSliderHeight			7.0
+
+static UIImage *closeImage = nil;
+
+@implementation BrushColorPicker
+@synthesize bcDelegate;
+
++(void)initialize{
+	closeImage = [[UIImage imageNamed:@"button_close.png"] retain];
+}
+
+- (id)initWithFrame:(CGRect)frame {
+	
+	self = [super initWithFrame:frame];
+	if (self) {
+	}
+	
+	self.backgroundColor = [UIColor clearColor];
+	closeButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	
+	closeButton.frame = CGRectMake(CGRectGetMaxX(self.bounds)-closeImage.size.width-5, 4, closeImage.size.width, closeImage.size.height);
+	closeButton.contentMode = UIViewContentModeTop;
+	[closeButton addTarget:self action:@selector(closeButtonAction) forControlEvents:UIControlEventTouchUpInside];
+	[closeButton setImage:closeImage forState:UIControlStateNormal];
+	[self addSubview:closeButton];
+	
+	return self;
+}
+
+-(void)closeButtonAction{
+	brush.brushColor = [colorPicker color];
+	if(bcDelegate && [bcDelegate respondsToSelector:@selector(closeBrushColorPicker)]){
+		[bcDelegate performSelector:@selector(closeBrushColorPicker)];
+	}
+}
+
+-(void)setBrush:(Brush*)aBrush{
+	brush = aBrush;
+	
+	const CGFloat *pxl = CGColorGetComponents(brush.brushColor.CGColor);
+	
+	NSLog(@"B Color %f,%f,%f,%f",pxl[0],pxl[1],pxl[2],pxl[3]);
+	
+	if(!colorPicker)
+	{
+		[self performSelector:@selector(initializeColorPicker)];
+	}
+}
+
+-(void)initializeColorPicker{
+	
+	NSString * coderPath = [NSHomeDirectory() stringByAppendingFormat:@"/Documents/save.dat"];
+	if ([[NSFileManager defaultManager] fileExistsAtPath:coderPath]) {
+		colorPicker = [[NSKeyedUnarchiver unarchiveObjectWithFile:coderPath] retain];
+	} else {
+		colorPicker = [[ColorPickerView alloc] initWithFrame:CGRectMake(10, CGRectGetMaxY(closeButton.bounds)+10, 270, 220)];
+	}
+	[colorPicker setColor:brush.brushColor];
+	[self addSubview:colorPicker];
+}
+
+- (void)drawRect:(CGRect)rect {
+	
+	[[UIColor colorWithRed:0.243 green:0.255 blue:0.293 alpha:1.0] set];	
+	UIBezierPath *rectsbyroundtop = [UIBezierPath bezierPathWithRoundedRect:rect byRoundingCorners:UIRectCornerAllCorners cornerRadii:CGSizeMake(5, 5)];
+	[rectsbyroundtop fill];
+}
+
+
+- (void)dealloc {
+	[colorPicker release];
+	[super dealloc];
+}
+
+
+@end
